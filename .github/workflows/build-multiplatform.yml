@@ -1,0 +1,296 @@
+name: Build Multi-Platform Executables
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - debug
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            executable_suffix: ""
+            setup_display: true
+          - os: windows-latest
+            platform: windows-x64
+            executable_suffix: ".exe"
+            setup_display: false
+          - os: macos-latest
+            platform: macos-x64
+            executable_suffix: ""
+            setup_display: false
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+    
+    - name: Set up virtual display (Linux)
+      if: matrix.setup_display
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        echo "DISPLAY=:99" >> $GITHUB_ENV
+    
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-tk \
+          python3-dev \
+          libffi-dev \
+          libjpeg-dev \
+          zlib1g-dev \
+          libfreetype6-dev \
+          liblcms2-dev \
+          libopenjp2-7-dev \
+          libtiff5-dev \
+          libwebp-dev \
+          tcl8.6-dev \
+          tk8.6-dev \
+          python3-pil \
+          python3-pil.imagetk
+    
+    - name: Install dependencies
+      run: |
+        uv sync --dev
+    
+    - name: Verify installation
+      run: |
+        uv run python -c "import tkinter; print('Tkinter OK')"
+        uv run python -c "import fitz; print('PyMuPDF OK')"
+        uv run python -c "import PIL; print('Pillow OK')"
+    
+    - name: Build executable
+      run: |
+        uv run python build.py
+      env:
+        DISPLAY: ${{ env.DISPLAY }}
+    
+    - name: Test executable (basic)
+      run: |
+        # Test that the executable can be created and shows help/version info
+        ls -la dist/
+        if [ "${{ runner.os }}" != "Windows" ]; then
+          chmod +x dist/PDF-Coordinate-Viewer-*
+          # Don't actually run GUI on CI, just check it exists
+          file dist/PDF-Coordinate-Viewer-* || true
+        else
+          dir dist\
+        fi
+      shell: bash
+    
+    - name: Create release archive
+      run: |
+        if [ "${{ runner.os }}" == "Windows" ]; then
+          # Use PowerShell on Windows
+          powershell Compress-Archive -Path "PDF-Coordinate-Viewer-*-Portable" -DestinationPath "PDF-Coordinate-Viewer-${{ matrix.platform }}.zip"
+        else
+          # Use tar on Unix systems
+          tar -czf "PDF-Coordinate-Viewer-${{ matrix.platform }}.tar.gz" PDF-Coordinate-Viewer-*-Portable/
+        fi
+      shell: bash
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDF-Coordinate-Viewer-${{ matrix.platform }}
+        path: |
+          dist/PDF-Coordinate-Viewer-*
+          PDF-Coordinate-Viewer-*-Portable/
+          release-info.json
+        retention-days: 30
+    
+    - name: Upload release archives
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDF-Coordinate-Viewer-${{ matrix.platform }}-archive
+        path: |
+          PDF-Coordinate-Viewer-${{ matrix.platform }}.*
+        retention-days: 90
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+    
+    - name: Display structure of downloaded files
+      run: ls -R artifacts/
+    
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: PDF Coordinate Viewer ${{ github.ref }}
+        body: |
+          ## PDF Coordinate Viewer Release
+          
+          ### Downloads
+          Choose the appropriate version for your operating system:
+          
+          - **Windows**: Download `PDF-Coordinate-Viewer-windows-x64.zip`
+          - **Linux**: Download `PDF-Coordinate-Viewer-linux-x64.tar.gz` 
+          - **macOS**: Download `PDF-Coordinate-Viewer-macos-x64.tar.gz`
+          
+          ### Installation
+          1. Download and extract the archive for your platform
+          2. Run the executable:
+             - **Windows**: Double-click `PDF-Coordinate-Viewer.exe`
+             - **Linux/macOS**: Run `./PDF-Coordinate-Viewer`
+          
+          ### Features
+          - Load and view PDF files with page navigation
+          - Click tracking with customizable coordinate origins
+          - Export click data to CSV
+          - Zoom controls and visual markers
+          - No Python installation required
+          
+          ### System Requirements
+          - **Windows**: Windows 7 or later
+          - **Linux**: Modern distribution with X11/Wayland
+          - **macOS**: macOS 10.13 or later
+          
+          Built with Python ${{ matrix.python-version }} using PyInstaller.
+        draft: false
+        prerelease: false
+    
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: artifacts/PDF-Coordinate-Viewer-windows-x64-archive/PDF-Coordinate-Viewer-windows-x64.zip
+        asset_name: PDF-Coordinate-Viewer-windows-x64.zip
+        asset_content_type: application/zip
+    
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: artifacts/PDF-Coordinate-Viewer-linux-x64-archive/PDF-Coordinate-Viewer-linux-x64.tar.gz
+        asset_name: PDF-Coordinate-Viewer-linux-x64.tar.gz
+        asset_content_type: application/gzip
+    
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: artifacts/PDF-Coordinate-Viewer-macos-x64-archive/PDF-Coordinate-Viewer-macos-x64.tar.gz
+        asset_name: PDF-Coordinate-Viewer-macos-x64.tar.gz
+        asset_content_type: application/gzip
+
+  build-summary:
+    name: Build Summary
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+    
+    - name: Generate build summary
+      run: |
+        echo "## 🚀 Multi-Platform Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Platform | Status | Executable Size | Package Size |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|--------|----------------|--------------|" >> $GITHUB_STEP_SUMMARY
+        
+        for platform in windows-x64 linux-x64 macos-x64; do
+          if [ -d "artifacts/PDF-Coordinate-Viewer-$platform" ]; then
+            # Find executable
+            if [ "$platform" = "windows-x64" ]; then
+              exe_file=$(find artifacts/PDF-Coordinate-Viewer-$platform -name "*.exe" | head -1)
+            else
+              exe_file=$(find artifacts/PDF-Coordinate-Viewer-$platform -name "PDF-Coordinate-Viewer-*" -type f ! -name "*.json" | head -1)
+            fi
+            
+            if [ -n "$exe_file" ] && [ -f "$exe_file" ]; then
+              exe_size=$(du -h "$exe_file" | cut -f1)
+              status="✅"
+            else
+              exe_size="N/A"
+              status="❌"
+            fi
+            
+            # Find package directory
+            pkg_dir=$(find artifacts/PDF-Coordinate-Viewer-$platform -name "*-Portable" -type d | head -1)
+            if [ -n "$pkg_dir" ] && [ -d "$pkg_dir" ]; then
+              pkg_size=$(du -sh "$pkg_dir" | cut -f1)
+            else
+              pkg_size="N/A"
+            fi
+            
+            echo "| $platform | $status | $exe_size | $pkg_size |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| $platform | ❌ | N/A | N/A |" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Available Downloads" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "🎉 **Release builds available in GitHub Releases**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "📋 **Development builds available in Actions artifacts**" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Build Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch/Tag**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Python Version**: 3.11" >> $GITHUB_STEP_SUMMARY 
