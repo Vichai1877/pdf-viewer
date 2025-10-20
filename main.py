@@ -8,27 +8,57 @@ from typing import List, Optional, Tuple
 import fitz  # PyMuPDF
 from PIL import Image, ImageTk
 
+# convert point in pdf to mm for Reportlab
+def pt2mm( pt : float =0 ) -> float :
+    return pt* 25.4 / 72
 
 class OriginPoint(Enum):
     """Enumeration for coordinate origin points."""
-
     TOP_LEFT = "Top-Left"
     TOP_RIGHT = "Top-Right"
     BOTTOM_LEFT = "Bottom-Left"
     BOTTOM_RIGHT = "Bottom-Right"
 
+@dataclass
+class DocumentPart(Enum):
+    """Enumeration for document part."""
+    HEADING = "Heading"
+    BODY = "Body"
+    SUMMARY = "Summary"
+    LINESPACE = "Linespace"  # for set line spacing by put line spacing to Raw_Y ใช้กำหนด ระยะ spacing โดยส่งค่าไปที่ "Raw_Y"
+
+@dataclass
+class DataTypes(Enum):
+    """Enumeration for document type."""
+    TEXT = "Text"
+    NUMBER0 = "Numeric"
+    NUMBER2 = "Numeric 2 digits"
+    DATE = "Date"
+    IMAGE = "Image"
+    VIDEO = "Video"
+    AUDIO = "Audio"
+
+class Alignments(Enum):
+    """Enumeration for alignment type."""
+    LEFT = "Left"
+    RIGHT = "Right"
+    CENTER = "Center"
 
 @dataclass
 class ClickData:
     """Data class to store click information."""
-
     page_number: int
     raw_x: float
     raw_y: float
     adjusted_x: float
     adjusted_y: float
     origin: OriginPoint
-
+    part : DocumentPart
+    name: str       # name of point
+    mm_x : float    # Millimeter unit (mm)
+    mm_y : float    # Millimeter unit (mm)
+    datatype : DataTypes    # type of data
+    alignment : Alignments  # alingment
 
 class CoordinateTransformer:
     """Handles coordinate transformations between different origin points."""
@@ -78,7 +108,7 @@ class PDFViewer:
         self.page_height = 0
 
         # UI state
-        self.selected_origin = tk.StringVar(value=OriginPoint.TOP_LEFT.value)
+        self.selected_origin = tk.StringVar(value=OriginPoint.BOTTOM_LEFT.value)
         self.click_history: List[ClickData] = []
         self.click_markers: List[int] = []  # Canvas item IDs for markers
 
@@ -184,7 +214,7 @@ class PDFViewer:
         canvas_frame.grid_columnconfigure(0, weight=1)
 
         # Right panel for coordinates and history
-        right_panel = ttk.Frame(content_frame, width=300)
+        right_panel = ttk.Frame(content_frame, width=350)
         right_panel.pack(side=tk.RIGHT, fill=tk.Y)
         right_panel.pack_propagate(False)
 
@@ -205,7 +235,7 @@ class PDFViewer:
         history_list_frame = ttk.Frame(history_frame)
         history_list_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        self.history_listbox = tk.Listbox(history_list_frame, font=("Courier", 9))
+        self.history_listbox = tk.Listbox(history_list_frame, font=("Helvetica", 11))
         history_scrollbar = ttk.Scrollbar(history_list_frame, orient=tk.VERTICAL, command=self.history_listbox.yview)
         self.history_listbox.configure(yscrollcommand=history_scrollbar.set)
 
@@ -219,15 +249,12 @@ class PDFViewer:
         history_controls = ttk.Frame(history_frame)
         history_controls.pack(fill=tk.X, padx=5, pady=(0, 5))
 
-        ttk.Button(history_controls, text="Clear History", command=self.clear_history).pack(side=tk.LEFT)
-        ttk.Button(history_controls, text="Edit Point", command=self.edit_selected_point).pack(
-            side=tk.LEFT, padx=(5, 0)
-        )
-        ttk.Button(history_controls, text="Delete Point", command=self.delete_selected_point).pack(
-            side=tk.LEFT, padx=(5, 0)
-        )
-        ttk.Button(history_controls, text="Import CSV", command=self.import_history).pack(side=tk.LEFT, padx=(5, 0))
-        ttk.Button(history_controls, text="Export CSV", command=self.export_history).pack(side=tk.RIGHT)
+        ttk.Button(history_controls, text="Clear History", command=self.clear_history).grid(row=0,column=0)
+        ttk.Button(history_controls, text="Edit Point", command=self.edit_selected_point).grid(row=0,column=1)
+        ttk.Button(history_controls, text="Delete Point", command=self.delete_selected_point).grid(row=0,column=2)
+
+        ttk.Button(history_controls, text="Import CSV", command=self.import_history).grid(row=1,column=0)
+        ttk.Button(history_controls, text="Export CSV", command=self.export_history).grid(row=1,column=1)
 
     def setup_bindings(self):
         """Set up event bindings."""
@@ -397,6 +424,12 @@ class PDFViewer:
             adjusted_x=adjusted_x,
             adjusted_y=adjusted_y,
             origin=origin,
+            part=DocumentPart.HEADING.value,
+            name=f"point_{len(self.click_history)+1}",  # not
+            mm_x= pt2mm(adjusted_x),
+            mm_y= pt2mm(adjusted_y),
+            datatype=DataTypes.TEXT.value,
+            alignment=Alignments.LEFT.value,
         )
 
         # Add to history
@@ -482,7 +515,7 @@ class PDFViewer:
         self.history_listbox.delete(0, tk.END)
 
         for i, click_data in enumerate(self.click_history):
-            entry = f"#{i + 1:2d} P{click_data.page_number} ({click_data.adjusted_x:.1f}, {click_data.adjusted_y:.1f})"
+            entry = f"#{i + 1:2d} P{click_data.page_number} ({click_data.adjusted_x:.1f}, {click_data.adjusted_y:.1f}) {click_data.name} {click_data.part}"
             self.history_listbox.insert(tk.END, entry)
 
         # Auto-scroll to bottom
@@ -565,13 +598,18 @@ class PDFViewer:
             return
 
         try:
-            with open(file_path, "w", newline="") as csvfile:
-                csvfile.write("Page,Origin,Raw_X,Raw_Y,Adjusted_X,Adjusted_Y\n")
+            with open(file_path, "w", newline="",encoding="UTF-8") as csvfile:
+                csvfile.write("Page,Origin,Raw_X,Raw_Y,X,Y,PART,NAME,MM_X,MM_Y,Data_Type,Align\n")
                 for click_data in self.click_history:
                     csvfile.write(
                         f"{click_data.page_number},{click_data.origin.value},"
                         f"{click_data.raw_x:.2f},{click_data.raw_y:.2f},"
-                        f"{click_data.adjusted_x:.2f},{click_data.adjusted_y:.2f}\n"
+                        f"{click_data.adjusted_x:.2f},{click_data.adjusted_y:.2f},"
+                        f"{click_data.part},"
+                        f"{click_data.name},"
+                        f"{click_data.mm_x:.2f},{click_data.mm_y:.2f},"
+                        f"{click_data.datatype},"
+                        f"{click_data.alignment}\n"
                     )
 
             messagebox.showinfo("Success", f"Click history exported to {file_path}")
@@ -604,9 +642,9 @@ class PDFViewer:
 
                     try:
                         parts = line.split(",")
-                        if len(parts) != 6:
+                        if len(parts) != 12:
                             messagebox.showwarning(
-                                "Warning", f"Line {line_num}: Invalid format, expected 6 columns, got {len(parts)}"
+                                "Warning", f"Line {line_num}: Invalid format, expected 12 columns, got {len(parts)}"
                             )
                             continue
 
@@ -616,6 +654,12 @@ class PDFViewer:
                         raw_y = float(parts[3])
                         adjusted_x = float(parts[4])
                         adjusted_y = float(parts[5])
+                        part = parts[6]
+                        name = parts[7]
+                        mm_x = float(parts[8])
+                        mm_y = float(parts[9])
+                        datatype = parts[10]
+                        alignment = parts[11]
 
                         # Validate origin
                         try:
@@ -633,6 +677,12 @@ class PDFViewer:
                             adjusted_x=adjusted_x,
                             adjusted_y=adjusted_y,
                             origin=origin,
+                            part=part,
+                            name=name,
+                            mm_x=mm_x,
+                            mm_y=mm_y,
+                            datatype=datatype,
+                            alignment=alignment
                         )
                         imported_clicks.append(click_data)
 
@@ -698,7 +748,7 @@ class PDFViewer:
         """Show dialog to edit coordinate values."""
         dialog = tk.Toplevel(self.root)
         dialog.title(f"Edit Point #{index + 1}")
-        dialog.geometry("450x420")
+        dialog.geometry("450x600")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -725,6 +775,53 @@ class PDFViewer:
         # Coordinate editing section
         coord_frame = ttk.LabelFrame(main_frame, text="Edit Coordinates", padding=10)
         coord_frame.pack(fill=tk.X, pady=(0, 15))
+        # Name of point
+        name_doc_frame = ttk.Frame(coord_frame)  # frame to contain point name and document part
+        name_doc_frame.pack(fill=tk.X, pady=(0, 15))
+        point_name_label = ttk.Label(name_doc_frame, text="Name of Point",font=("Arial", 9, "bold"))
+        point_name_label.grid(column=0,row=0,sticky="W",pady=(0,5))
+        point_name_var = tk.StringVar(value=click_data.name)
+        point_name_label = ttk.Entry(name_doc_frame,textvariable=point_name_var,width=30)
+        point_name_label.grid(column=0,row=1,pady=(0,5))
+        # Document-Part editing section
+        docpart_var = tk.StringVar()
+        docpart_label = ttk.Label(name_doc_frame, text="Document Part", font=("Arial", 9, "bold"))
+        docpart_label.grid(column=1,row=0,padx=6, pady=(0, 5),sticky="W")
+        docpart_cbx = ttk.Combobox(
+            name_doc_frame,
+            textvariable=docpart_var,
+            values=[doc.value for doc in DocumentPart],
+            width=15
+        )
+        docpart_var.set(click_data.part)
+        docpart_cbx.grid(column=1,row=1,padx=6, pady=(0,5),sticky="W")
+        # frame for Type of data and alingment
+        type_align_frame = ttk.Frame(coord_frame) # frame to contain type and aling combobox
+        type_align_frame.pack(fill=tk.X, pady=(0, 15))
+        # Type of data
+        datatype_label = ttk.Label(type_align_frame,text="Data Type",font=("Arial", 9, "bold"))
+        datatype_label.grid(column=0,row=0,sticky="W",pady=(0,5))
+        datatype_var = tk.StringVar()
+        datatype_cbx = ttk.Combobox(
+            type_align_frame,
+            textvariable=datatype_var,
+            values=[t.value for t in DataTypes],
+            width=21
+        )
+        datatype_var.set(click_data.datatype)
+        datatype_cbx.grid(column=0,row=1,padx=(0,6), pady=(0,5),sticky="W")
+        # Alignment
+        align_label = ttk.Label(type_align_frame,text="Alignment",font=("Arial", 9, "bold"))
+        align_label.grid(column=1,row=0,sticky="W",pady=(0,5))
+        align_var = tk.StringVar(value=click_data.alignment)
+        align_cbx = ttk.Combobox(
+            type_align_frame,
+            textvariable=align_var,
+            values=[a.value for a in Alignments],
+            width=21
+        )
+        align_var.set(click_data.alignment)
+        align_cbx.grid(column=1,row=1,padx=(6,0), pady=(0,5),sticky="W")
 
         # Raw coordinates section
         raw_label = ttk.Label(coord_frame, text="Raw Coordinates (Top-Left):", font=("Arial", 9, "bold"))
@@ -778,6 +875,10 @@ class PDFViewer:
         button_frame.pack(fill=tk.X, pady=(15, 10))
 
         def apply_changes():
+            click_data.name = point_name_var.get()  # chang point name
+            click_data.part = docpart_var.get()  # chang document part
+            click_data.datatype = datatype_var.get()  # change data type
+            click_data.alignment = align_var.get()  # change alignmant
             try:
                 # Get new values
                 new_raw_x = float(raw_x_var.get())
@@ -796,13 +897,19 @@ class PDFViewer:
                         click_data.adjusted_x, click_data.adjusted_y = CoordinateTransformer.adjust_coordinates(
                             new_raw_x, new_raw_y, self.page_width, self.page_height, click_data.origin
                         )
+                        click_data.mm_x = pt2mm(new_adj_x)
+                        click_data.mm_y = pt2mm(new_adj_y)
                     else:
                         click_data.adjusted_x = new_adj_x
                         click_data.adjusted_y = new_adj_y
+                        click_data.mm_x=pt2mm(new_adj_x)
+                        click_data.mm_y=pt2mm(new_adj_y)
                 else:
                     # Only adjusted coordinates changed
                     click_data.adjusted_x = new_adj_x
                     click_data.adjusted_y = new_adj_y
+                    click_data.mm_x = pt2mm(new_adj_x)
+                    click_data.mm_y = pt2mm(new_adj_y)
 
                 # Update displays
                 self.update_history_listbox()
