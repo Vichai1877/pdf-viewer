@@ -1035,11 +1035,18 @@ class PDFViewer:
         self.history_listbox.selection_set(self.dragging_point)
         self.history_listbox.see(self.dragging_point)
 
+        # detect alignment of history point
+        align_mark = self.detect_alignment_guide(canvas_x=canvas_x, canvas_y=canvas_y)
+
     def on_marker_release(self, event):
         """Handle mouse release after dragging."""
+        self.canvas.delete("alignment")
+        #self.canvas.delete("guide_y")
         if self.dragging_point is not None:
             self.dragging_point = None
             self.canvas.config(cursor="")  # Reset cursor
+
+
 
     def find_marker_at_position(self, canvas_x, canvas_y):
         """Find if there's a marker at the given canvas position."""
@@ -1115,6 +1122,32 @@ class PDFViewer:
 
             messagebox.showinfo("Success", f"Point #{selected_index + 1} deleted successfully!")
 
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # addition function
+    def detect_alignment_guide(self, canvas_x, canvas_y):
+        threshold = 1  # Pixels tolerance for clicking on marker
+        for i, click_data in enumerate(self.click_history):
+            if not i == self.dragging_point:
+                if click_data.page_number == self.current_page_number + 1:
+                    marker_x = click_data.raw_x * self.zoom_factor
+                    marker_y = click_data.raw_y * self.zoom_factor
+
+                    # Check if click is within tolerance of marker
+                    if abs(canvas_x - marker_x) <= threshold  :
+                        guide_x = self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
+                                                          tags=("alignment",f"guide_x{i}"))
+                    else :
+                        for obj_id in self.canvas.find_withtag(f"guide_x{i}"):
+                            self.canvas.delete(obj_id)
+                    if abs(canvas_y - marker_y) <= threshold:
+                        guide_y = self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
+                                                          tags=("alignment",f"guide_y{i}"))
+                    else :
+                        for obj_id in self.canvas.find_withtag(f"guide_y{i}"):
+                            self.canvas.delete(obj_id)
+
+        return -1
+
 
 def get_screen_geometry(root):
     """Get available screen geometry accounting for taskbar and decorations."""
@@ -1158,6 +1191,7 @@ def get_screen_geometry(root):
         work_y = 0
 
         return work_width, work_height, work_x, work_y
+
 
 
 def main():
