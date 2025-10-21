@@ -1124,7 +1124,7 @@ class PDFViewer:
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # addition function
     def detect_alignment_guide(self, canvas_x, canvas_y):
-        threshold = 3  # Pixels tolerance for clicking on marker
+        threshold = 2  # Pixels tolerance for clicking on marker
         for i, click_data in enumerate(self.click_history):
             if not i == self.dragging_point:
                 if click_data.page_number == self.current_page_number + 1:
@@ -1133,11 +1133,13 @@ class PDFViewer:
 
                     # Check if click is within tolerance of marker
                     if abs(canvas_x - marker_x) <= threshold  :
-                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,tags=f"guide_x{i}")
+                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
+                                                fill="lightblue",tags=f"guide_x{i}")
                     else :
                         self.canvas.delete(f"guide_x{i}")
                     if abs(canvas_y - marker_y) <= threshold:
-                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,tags=f"guide_y{i}")
+                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
+                                                fill="lightblue",tags=f"guide_y{i}")
                     else :
                         self.canvas.delete(f"guide_y{i}")
         return -1
@@ -1150,26 +1152,27 @@ class PDFViewer:
                 py = click_data.raw_y
                 for obj_id in self.canvas.find_withtag(f"guide_x{i}"):
                     self.canvas.delete(obj_id)  #delete guide x axis line
-                    self.get_snap_point_x(self.dragging_point,click_data)
-                    
+                    self.snap_point_x_axis(self.dragging_point,click_data)
+
                 for obj_id in self.canvas.find_withtag(f"guide_y{i}"):
                     self.canvas.delete(obj_id)   #delete guide y axis line
-                    self.get_snap_point_y(self.dragging_point,click_data)
+                    self.snap_point_y_axis(self.dragging_point,click_data)
 
         # Update displays
         self.redraw_markers()
         self.update_history_listbox()
 
-    def get_snap_point_x(self,drag : int ,snap : ClickData):
+    def snap_point_x_axis(self,drag : int ,snap : ClickData):
         self.click_history[drag].raw_x=snap.raw_x
         self.click_history[drag].adjusted_x = snap.adjusted_x
         self.click_history[drag].mm_x = snap.mm_x
 
-    def get_snap_point_y(self,drag : int ,snap : ClickData):
+    def snap_point_y_axis(self,drag : int ,snap : ClickData):
         self.click_history[drag].raw_y=snap.raw_y
         self.click_history[drag].adjusted_y = snap.adjusted_y
         self.click_history[drag].mm_x = snap.mm_x
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 def get_screen_geometry(root):
     """Get available screen geometry accounting for taskbar and decorations."""
