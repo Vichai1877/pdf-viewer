@@ -515,7 +515,7 @@ class PDFViewer:
         self.history_listbox.delete(0, tk.END)
 
         for i, click_data in enumerate(self.click_history):
-            entry = f"#{i + 1:2d} P{click_data.page_number} ({click_data.adjusted_x:.1f}, {click_data.adjusted_y:.1f}) {click_data.name} {click_data.part}"
+            entry = f"#{i + 1:2d} P{click_data.page_number} ({click_data.raw_x:.1f}, {click_data.raw_y:.1f}) {click_data.name} {click_data.part}"
             self.history_listbox.insert(tk.END, entry)
 
         # Auto-scroll to bottom
