@@ -1,0 +1,12 @@
+Page,Origin,Raw_X,Raw_Y,X,Y,PART,NAME,MM_X,MM_Y,Data_Type,Align
+1,Bottom-Left,276.82,70.67,276.82,524.65,Heading,BillID,97.66,185.08,Text,Left
+1,Bottom-Left,275.99,106.33,275.99,488.99,Heading,OrderDate,97.36,172.50,Date,Left
+1,Bottom-Left,42.57,138.62,42.57,456.70,Heading,NameInThai,15.02,161.11,Text,Left
+1,Bottom-Left,41.52,168.40,41.52,426.92,Heading,Address,14.65,150.61,Text,Left
+1,Bottom-Left,397.20,524.50,397.20,70.82,Heading,NetNet,140.12,24.98,Numeric 2 digits,Right
+1,Bottom-Left,37.33,236.77,37.33,358.55,Body,Unit_Quan,13.17,126.49,Numeric,Right
+1,Bottom-Left,44.88,236.56,44.88,358.76,Body,Unit_Name,15.83,126.56,Text,Left
+1,Bottom-Left,77.80,236.35,77.80,358.97,Body,Product_Name,27.45,126.64,Text,Left
+1,Bottom-Left,327.16,236.35,327.16,358.97,Body,Unit_Price,115.41,126.64,Numeric 2 digits,Right
+1,Bottom-Left,399.09,236.56,399.09,358.76,Body,Total,140.79,126.56,Numeric 2 digits,Right
+1,Bottom-Left,0.00,24.00,0.00,571.32,Linespace,LineSpaceing,3.35,201.55,Text,Left

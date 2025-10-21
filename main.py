@@ -1040,13 +1040,12 @@ class PDFViewer:
 
     def on_marker_release(self, event):
         """Handle mouse release after dragging."""
-        self.canvas.delete("alignment")
+        self.snap_to_guide()
         #self.canvas.delete("guide_y")
         if self.dragging_point is not None:
             self.dragging_point = None
             self.canvas.config(cursor="")  # Reset cursor
-
-
+            #self.snap_to_guide()
 
     def find_marker_at_position(self, canvas_x, canvas_y):
         """Find if there's a marker at the given canvas position."""
@@ -1125,7 +1124,7 @@ class PDFViewer:
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # addition function
     def detect_alignment_guide(self, canvas_x, canvas_y):
-        threshold = 1  # Pixels tolerance for clicking on marker
+        threshold = 3  # Pixels tolerance for clicking on marker
         for i, click_data in enumerate(self.click_history):
             if not i == self.dragging_point:
                 if click_data.page_number == self.current_page_number + 1:
@@ -1134,19 +1133,42 @@ class PDFViewer:
 
                     # Check if click is within tolerance of marker
                     if abs(canvas_x - marker_x) <= threshold  :
-                        guide_x = self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
-                                                          tags=("alignment",f"guide_x{i}"))
+                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,tags=f"guide_x{i}")
                     else :
-                        for obj_id in self.canvas.find_withtag(f"guide_x{i}"):
-                            self.canvas.delete(obj_id)
+                        self.canvas.delete(f"guide_x{i}")
                     if abs(canvas_y - marker_y) <= threshold:
-                        guide_y = self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,
-                                                          tags=("alignment",f"guide_y{i}"))
+                        self.canvas.create_line(canvas_x,canvas_y,marker_x,marker_y,tags=f"guide_y{i}")
                     else :
-                        for obj_id in self.canvas.find_withtag(f"guide_y{i}"):
-                            self.canvas.delete(obj_id)
-
+                        self.canvas.delete(f"guide_y{i}")
         return -1
+
+    def snap_to_guide(self):
+        for i, click_data in enumerate(self.click_history):
+            if not i == self.dragging_point:
+
+                px = click_data.raw_x
+                py = click_data.raw_y
+                for obj_id in self.canvas.find_withtag(f"guide_x{i}"):
+                    self.canvas.delete(obj_id)  #delete guide x axis line
+                    self.get_snap_point_x(self.dragging_point,click_data)
+                    
+                for obj_id in self.canvas.find_withtag(f"guide_y{i}"):
+                    self.canvas.delete(obj_id)   #delete guide y axis line
+                    self.get_snap_point_y(self.dragging_point,click_data)
+
+        # Update displays
+        self.redraw_markers()
+        self.update_history_listbox()
+
+    def get_snap_point_x(self,drag : int ,snap : ClickData):
+        self.click_history[drag].raw_x=snap.raw_x
+        self.click_history[drag].adjusted_x = snap.adjusted_x
+        self.click_history[drag].mm_x = snap.mm_x
+
+    def get_snap_point_y(self,drag : int ,snap : ClickData):
+        self.click_history[drag].raw_y=snap.raw_y
+        self.click_history[drag].adjusted_y = snap.adjusted_y
+        self.click_history[drag].mm_x = snap.mm_x
 
 
 def get_screen_geometry(root):
