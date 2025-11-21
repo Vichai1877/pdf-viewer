@@ -1,0 +1,15 @@
+Page,Origin,Raw_X,Raw_Y,X,Y,PART,NAME,MM_X,MM_Y,Data_Type,Align
+1,Bottom-Left,78.38,159.65,78.38,666.43,Heading,NameInThai,27.65,235.10,Text,Left
+1,Bottom-Left,405.01,157.55,405.01,668.53,Heading,OrderDate,142.88,235.84,Date,Left
+1,Bottom-Left,66.85,185.86,66.85,640.22,Heading,Address,23.58,225.86,Text,Left
+1,Bottom-Left,398.20,214.17,398.20,611.91,Heading,TNumber,140.48,215.87,Text,Left
+1,Bottom-Left,457.97,56.89,457.97,769.19,Heading,BillID,161.56,271.35,Text,Left
+1,Bottom-Left,491.78,586.15,491.78,239.93,Heading,ValueAmount,173.49,84.64,Numeric 2 digits,Right
+1,Bottom-Left,491.78,612.11,491.78,213.97,Heading,AddVATAmount,173.49,75.48,Numeric 2 digits,Right
+1,Bottom-Left,491.78,635.96,491.78,190.12,Heading,NetNet,173.49,67.07,Numeric 2 digits,Right
+1,Bottom-Left,17.56,284.69,17.56,541.39,Body,Unit_Quan,6.19,190.99,Numeric,Left
+1,Bottom-Left,37.75,284.69,37.75,541.39,Body,Unit_Name,13.32,190.99,Text,Left
+1,Bottom-Left,69.99,284.69,69.99,541.39,Body,Product_Name,24.69,190.99,Text,Left
+1,Bottom-Left,397.41,284.69,397.41,541.39,Body,Unit_Price,140.20,190.99,Numeric 2 digits,Right
+1,Bottom-Left,491.78,284.69,491.78,541.39,Body,Total,173.49,190.99,Numeric 2 digits,Right
+1,Bottom-Left,0.00,26.00,0.00,800.08,Linespace,LineSpacing,109.71,167.60,Text,Left
