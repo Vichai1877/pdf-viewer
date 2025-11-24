@@ -229,6 +229,14 @@ class PDFViewer:
         ttk.Button(zoom_frame, text="Zoom Out", command=self.zoom_out).pack(side=tk.LEFT, padx=2, pady=5)
         ttk.Button(zoom_frame, text="Reset", command=self.reset_zoom).pack(side=tk.LEFT, padx=2, pady=5)
 
+        # Show text alignment
+        demo_frame = ttk.LabelFrame(control_frame, text="Demo")
+        demo_frame.pack(side=tk.LEFT,padx=(10,0))
+        self.show_text = tk.BooleanVar()
+        cbx_show = tk.Checkbutton(demo_frame,text="Show Text",variable=self.show_text,
+                                  onvalue=True,offvalue=False,command=self.on_show_text_cbx)
+        cbx_show.pack(padx=2,pady=5)
+
         # Main content area
         content_frame = ttk.Frame(main_frame)
         content_frame.pack(fill=tk.BOTH, expand=True)
@@ -1250,6 +1258,9 @@ class PDFViewer:
         self.click_history[drag].adjusted_y = snap.adjusted_y
         self.click_history[drag].mm_x = snap.mm_x
 
+    def on_show_text_cbx(self):
+        print(f"show = {self.show_text.get()}")
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 def get_screen_geometry(root):
@@ -1295,8 +1306,6 @@ def get_screen_geometry(root):
 
         return work_width, work_height, work_x, work_y
 
-
-
 def main():
     """Main application entry point."""
     # Create and configure the main window
@@ -1331,6 +1340,7 @@ def main():
 
     # Start the GUI event loop
     root.mainloop()
+
 
 
 if __name__ == "__main__":
