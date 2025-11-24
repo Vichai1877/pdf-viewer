@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import Enum
 from tkinter import filedialog, messagebox, ttk
 from typing import List, Optional, Tuple
-from PopupTreeview import PopupTView
 
 import fitz  # PyMuPDF
 from PIL import Image, ImageTk
@@ -60,45 +59,6 @@ class ClickData:
     mm_y : float    # Millimeter unit (mm)
     datatype : DataTypes    # type of data
     alignment : Alignments  # alingment
-
-name_list = [
-    #---------------BillMaster field ----------------------------
-    # ----- Customer/Supplier detail -----------------------------
-    ["NameInThai","ชื่อบริษัท",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["Address","ที่อยู่",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["TNumber","เลขประจำตัวผู้เสียภาษี",DocumentPart.HEADING.value,DataTypes.TEXT.value ,Alignments.LEFT.value],
-    ["ContactName1","ชื่อผู้ติดต่อ",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["CreditDay","เครดิต(วัน)" ,DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    #------- BillMaster field ----------------------------
-    ["BillID","เลขที่บิล",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["BillRef","เลขที่อ้างอิง",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["OrderDate","วันที่",DocumentPart.HEADING.value,DataTypes.DATE.value,Alignments.LEFT.value],
-    ["DueMemo","บันทึก" ,DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["ToDue" ,"วันครบกำหนด",DocumentPart.HEADING.value,DataTypes.DATE.value,Alignments.LEFT.value],
-    ["AddVAT","อัตราภาษี %",DocumentPart.HEADING.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["ValueAmount","มูลค่าก่อน VAT",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["AddVATAmount","ภาษีมูลค่าเพิ่ม",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["NetNet" ,"ยอดรวมทั้งสิ้น",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["NetBefore","มูลค่าก่อนส่วนลดท้ายบิลและVat",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["DiscountPercent1","ส่วนลด % #1",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["DiscountPercent2","ส่วนลด % #2",DocumentPart.HEADING.value,DataTypes.NUMBER2.value ,Alignments.RIGHT.value],
-    ["DiscountPercent3","ส่วนลด % #3",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["DiscountPercent4" ,"ส่วนลด % #4",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["DiscountPercent5" ,"ส่วนลด % #5",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Discount2" ,"ส่วนลด (บาท)",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["DiscountAmount","มูลค่าส่วนลดรวม",DocumentPart.HEADING.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    # Body part -----------------------------------------------
-    ["Product_Name","ชื่อสินค้า",DocumentPart.BODY.value,DataTypes.TEXT.value,Alignments.LEFT.value],
-    ["Unit_Name","ชื่อหน่วย",DocumentPart.BODY.value,DataTypes.TEXT.value,Alignments.CENTER.value],
-    ["Unit_Quan" , "จำนวนหน่วย",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.CENTER.value],
-    ["Unit_Price", "ราคาต่อหน่วย",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Total" ,"ราคารวม",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Discount_P" ,"ส่วนลด เปอร์เซ็นต์ #1",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Discount_P2" ,"ส่วนลด เปอร์เซ็นต์ #2",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Discount_A" ,"ส่วนลด (บาท)",DocumentPart.BODY.value,DataTypes.NUMBER2.value,Alignments.RIGHT.value],
-    ["Line_Number" ,"line number",DocumentPart.BODY.value,DataTypes.NUMBER0.value,Alignments.CENTER.value],
-    ["LineSpacing","ระยะห่างระหว่างบรรทัด", DocumentPart.LINESPACE.value,DataTypes.TEXT.value,Alignments.LEFT.value]
-]
 
 class CoordinateTransformer:
     """Handles coordinate transformations between different origin points."""
@@ -325,10 +285,18 @@ class PDFViewer:
         self.canvas.bind("<ButtonRelease-1>", self.on_marker_release)
 
     def on_mousewheel(self, event):
+        ctrl_pressed = (event.state & 0x0004) != 0
+        if ctrl_pressed :
+            #press ctrl for zoom canvas
+            self.on_zoom_mouse_wheel(event)
+        else :
+            # not press ctrl y-scroll canvas
+            self.on_yscroll_mouse_wheel(event)
+
+    def on_yscroll_mouse_wheel(self,event):
         """Handle vertical mouse wheel scrolling."""
         if not self.pdf_document:
             return
-
         # Check if there's content to scroll
         bbox = self.canvas.bbox("all")
         if not bbox or self.canvas.winfo_height() >= bbox[3]:
@@ -341,6 +309,16 @@ class PDFViewer:
         elif event.num == 5 or event.delta < 0:
             # Scroll down
             self.canvas.yview_scroll(1, "units")
+
+    def on_zoom_mouse_wheel(self, event):
+        # zoom function from mouse wheel
+        zoom_step = 0.001
+        self.zoom_factor += zoom_step*event.delta
+        if self.zoom_factor < 0.2:
+            self.zoom_factor = 0.2
+        if self.zoom_factor > 5.0:
+            self.zoom_factor = 5.0
+        self.load_page()
 
     def on_horizontal_mousewheel(self, event):
         """Handle horizontal mouse wheel scrolling (with Shift)."""
@@ -785,25 +763,6 @@ class PDFViewer:
         self.show_edit_coordinate_dialog(click_data, selected_index)
 
     def show_edit_coordinate_dialog(self, click_data: ClickData, index: int):
-
-        def on_name_button(master : tk.Tk) :
-            pop = PopupTView(
-                master,
-                width="600",
-                columns=["Name","Detail","Part","Type","Align"],
-                columns_width=["150","180","80","100","80"],
-                columns_anchor=["w","w","w","w","w"],
-                values=name_list,
-                callbackfunc=call_func_select_name,
-            )
-            reason_window = pop
-        def call_func_select_name(name) :
-            if name :
-                point_name_var.set(name[0])
-                docpart_var.set(name[2])
-                datatype_var.set(name[3])
-                align_var.set(name[4])
-
         """Show dialog to edit coordinate values."""
         dialog = tk.Toplevel(self.root)
         dialog.title(f"Edit Point #{index + 1}")
@@ -837,9 +796,7 @@ class PDFViewer:
         # Name of point
         name_doc_frame = ttk.Frame(coord_frame)  # frame to contain point name and document part
         name_doc_frame.pack(fill=tk.X, pady=(0, 15))
-        #------------------------------------------------------------------------------------------
-        point_name_label = tk.Button(name_doc_frame, text="Name of Point",font=("Arial", 9, "bold"),
-                                     command=lambda : on_name_button(point_name_label))
+        point_name_label = ttk.Label(name_doc_frame, text="Name of Point",font=("Arial", 9, "bold"))
         point_name_label.grid(column=0,row=0,sticky="W",pady=(0,5))
         point_name_var = tk.StringVar(value=click_data.name)
         point_name_label = ttk.Entry(name_doc_frame,textvariable=point_name_var,width=30)
